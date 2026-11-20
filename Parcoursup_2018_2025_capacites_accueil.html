@@ -5739,6 +5739,9 @@ box-shadow: 0 3px 12px rgba(30, 50, 80, .12);
 .tableau-candidatures-js th,.tableau-candidatures-js td {border-bottom:1px solid #e4e8ee; padding:6px; text-align:right;}
 .tableau-candidatures-js th:first-child,.tableau-candidatures-js td:first-child {text-align:left;}
 .tableau-candidatures-js th {background:#edf2f8;}
+.tableau-candidatures-js .ligne-total-capacites th,
+.tableau-candidatures-js .ligne-total-capacites td {font-weight:700;background:#e9f0f8;border-top:2px solid #9cacc0;}
+#candidatures_graphique_global {max-width:900px;margin:12px auto 28px;}
 .tableau-candidatures-conteneur {overflow-x:auto;}
 .legende-candidatures {display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin:14px;}
 .legende-candidatures span::before {content:"";display:inline-block;width:25px;height:3px;background:var(--couleur);vertical-align:middle;margin-right:6px;}
@@ -5820,6 +5823,21 @@ Privé — Afficher / masquer le tableau
 Non renseigné — Afficher / masquer le tableau
 </summary>
 <div id="tableau-candidatures-non-renseigne" class="tableau-candidatures-conteneur">
+
+</div>
+</details>
+</div>
+<div id="évolution-globale-des-capacités-daccueil-par-secteur" class="section level3">
+<h3>Évolution globale des capacités d’accueil par secteur</h3>
+<details class="tableau_depliable">
+<summary>
+Toutes filières — Afficher / masquer le graphique
+</summary>
+<div class="legende-candidatures">
+<p><span style="--couleur:#2878B5">Ensemble (y compris non
+renseigné)</span> <span style="--couleur:#27966B">Public</span> <span style="--couleur:#C43C78">Privé</span></p>
+</div>
+<div id="candidatures_graphique_global">
 
 </div>
 </details>
@@ -6087,7 +6105,20 @@ Non renseigné — Afficher / masquer le tableau
     });
     return [...map.values()].map(v=>({...v,total:v.n?v.total:null}));
   }
-  function dessinerTableau(ag,voie) {
+  function totauxParSecteur(rows) {
+    const map = new Map();
+    rows.forEach(r=>{
+      [r.secteur,'Ensemble'].forEach(voie=>{
+        const key=JSON.stringify([r.annee,voie]);
+        if(!map.has(key)) map.set(key,{filiere:'Toutes filières',annee:r.annee,voie,total:0,n:0,manquants:0});
+        const item=map.get(key);
+        if(r.capacite!==null && Number.isFinite(r.capacite)){item.total+=r.capacite;item.n++;}
+        item.manquants+=r.valeurs_manquantes||0;
+      });
+    });
+    return [...map.values()].map(v=>({...v,total:v.n?v.total:null}));
+  }
+  function dessinerTableau(ag,voie,totaux) {
     const filieres=uniques(ag.filter(r=>r.voie===voie),'filiere');
     let html='<table class="tableau-candidatures-js"><thead><tr><th>Filière de formation</th>'+annees.map(a=>'<th>'+a+'</th>').join('')+'</tr></thead><tbody>';
     filieres.forEach(f=>{
@@ -6098,13 +6129,18 @@ Non renseigné — Afficher / masquer le tableau
       });
       html+='</tr>';
     });
-    html+='</tbody></table>';
+    html+='<tr class="ligne-total-capacites"><th>Total des capacités d’accueil</th>';
+    annees.forEach(a=>{
+      const r=totaux.find(x=>x.annee===a && x.voie===voie);
+      html+='<td'+(r&&r.manquants?' title="Total partiel : certaines capacités ne sont pas renseignées"':'')+'>'+fmt(r?r.total:null)+'</td>';
+    });
+    html+='</tr></tbody></table>';
     document.getElementById(ids[voie]).innerHTML=html;
   }
-  function svgGraphique(filiere,ag) {
+  function svgGraphique(filiere,ag,voiesAffichees=voies) {
     const w=560,h=300,left=72,right=18,top=20,bottom=55;
     const pw=w-left-right,ph=h-top-bottom;
-    const series=voies.map(v=>({voie:v,points:annees.map(a=>ag.find(x=>x.filiere===filiere && x.annee===a && x.voie===v))}));
+    const series=voiesAffichees.map(v=>({voie:v,points:annees.map(a=>ag.find(x=>x.filiere===filiere && x.annee===a && x.voie===v))}));
     const valeurs=series.flatMap(s=>s.points.map(p=>p?p.total:null)).filter(v=>v!==null);
     const max=Math.max(1,...valeurs)*1.08;
     const x=a=>left+(a-2018)*pw/7;
@@ -6137,7 +6173,9 @@ Non renseigné — Afficher / masquer le tableau
       (!filieresSelectionnees.size||filieresSelectionnees.has(r.filiere_formation)) && detailOK(r));
     const tables=agregation(rows,'filiere');
     const graphs=agregation(rows,'filiere_graphique');
-    voies.forEach(v=>dessinerTableau(tables,v));
+    const totaux=totauxParSecteur(rows);
+    voies.forEach(v=>dessinerTableau(tables,v,totaux));
+    document.getElementById('candidatures_graphique_global').innerHTML=svgGraphique('Toutes filières',totaux,['Ensemble','Public','Privé']);
     graphes.innerHTML=uniques(graphs,'filiere').map(f=>svgGraphique(f,graphs)).join('')||'<p>Aucune donnée pour cette sélection.</p>';
     const manquants=rows.reduce((s,r)=>s+(r.valeurs_manquantes||0),0);
     message.textContent=(secteur.value?'Sélectivité : '+secteur.value:'Toutes sélectivités')+
