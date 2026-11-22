@@ -5057,7 +5057,8 @@ tri
 période au gré des réformes.</p>
 <details class="tableau_depliable">
 <summary>
-Afficher / masquer les modalités des filières de formation (2018–2025)
+Afficher / masquer les modalités des filières de formation très agrégées
+(2018–2025)
 </summary>
 <table class="tableau_2">
 <thead>
@@ -5481,7 +5482,11 @@ de formation très agrégée » ont été regroupées comme suit :
 Les DUT et les BUT ont été regroupés sous « DUT-BUT ».
 </li>
 <li>
-Les PACES, PASS ont été regroupés sous « PACES-PASS ».
+Les PACES et les PASS ont été regroupés sous « PACES-PASS ».
+</li>
+<li>
+Les Licence et Licence_Las ont été regroupées sous « Licence et
+Licence_Las ».
 </li>
 </ul>
 <details class="titre_depliable" open>
@@ -5764,6 +5769,7 @@ box-shadow: 0 3px 12px rgba(30, 50, 80, .12);
 .tableau-candidatures-conteneur {overflow-x:auto;}
 .legende-candidatures {display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin:14px;}
 .legende-candidatures span::before {content:"";display:inline-block;width:25px;height:3px;background:var(--couleur);vertical-align:middle;margin-right:6px;}
+.legende-candidatures span.legende-point-isole::before {width:8px;height:8px;border-radius:50%;}
 </style>
 <div class="filtres-candidatures">
   <label>Sélectivité
@@ -6256,8 +6262,12 @@ graphiques.</p>
       });flush();
     });
     svg+='</svg>';
-    const legende='<div class="legende-candidatures">'+voiesAffichees.map(v=>'<span style="--couleur:'+couleurs[v]+'">'+esc(v)+'</span>').join('')+'</div>';
-    return '<div class="graph-candidatures"><h4>'+esc(filiere)+'</h4>'+svg+legende+'</div>';
+    const legende='<div class="legende-candidatures">'+series.filter(s=>s.points.some(p=>p&&p.total!==null)).map(s=>{
+      const anneesPresentes=s.points.map((p,i)=>p&&p.total!==null?annees[i]:null).filter(a=>a!==null);
+      const pointIsole=s.voie==='Non renseigné'&&anneesPresentes.length===1&&anneesPresentes[0]===2018;
+      return '<span'+(pointIsole?' class="legende-point-isole"':'')+' style="--couleur:'+couleurs[s.voie]+'">'+esc(s.voie)+(pointIsole?' (2018)':'')+'</span>';
+    }).join('')+'</div>';
+    return '<div class="graph-candidatures"><h4>'+esc(filiere+' - capacités d’accueil - effectifs')+'</h4>'+svg+legende+'</div>';
   }
   function svgIndiceCapacites(filiere, ag, base, voiesAffichees=voies) {
     const w=760,h=315,left=66,right=18,top=25,bottom=48;
@@ -6310,8 +6320,8 @@ graphiques.</p>
       svg+='<text x="'+mid+'" y="'+(yy+33)+'" text-anchor="middle" font-size="10" fill="#444">'+(s.delta>0?'+':'')+fmt(s.delta)+'</text>';
     });
     svg+='</svg>';
-    const legende='<div class="legende-indice-capacites">'+voiesAffichees.map(v=>'<span style="--couleur:'+couleurs[v]+'">'+esc(v)+'</span>').join('')+'<span class="reference-indice">Référence : indice 100</span></div>';
-    return '<div class="graph-candidatures"><h4>'+esc(filiere)+'</h4>'+svg+legende+'</div>';
+    const legende='<div class="legende-indice-capacites">'+indexed.filter(s=>s.values.some(v=>v!==null)).map(s=>'<span style="--couleur:'+couleurs[s.voie]+'">'+esc(s.voie)+'</span>').join('')+'<span class="reference-indice">Référence : indice 100</span></div>';
+    return '<div class="graph-candidatures"><h4>'+esc(filiere+' - capacités d’accueil - indice base 100 en '+base)+'</h4>'+svg+legende+'</div>';
   }
   function actualiser() {
     const rows=data.filter(r=>(!secteur.value||r.selectivite===secteur.value)&&
@@ -6323,9 +6333,9 @@ graphiques.</p>
     const graphs=agregation(rows,'filiere_graphique');
     const totaux=totauxParSecteur(rows);
     voies.forEach(v=>dessinerTableau(tables,v,totaux));
-    document.getElementById('candidatures_graphique_global').innerHTML=svgGraphique('Toutes filières',totaux,['Ensemble','Public','Privé']).replace('<h4>Toutes filières</h4>', '<h4>Toutes filières - nombre de places</h4>');
-    document.getElementById('capacites_graphique_global_indice_2020').innerHTML=svgIndiceCapacites('Toutes filières',totaux,2020,['Ensemble','Public','Privé']).replace('<h4>Toutes filières</h4>', '<h4>Toutes filières - indice valeur 100 en 2020</h4>');
-    document.getElementById('capacites_graphique_global_indice_2022').innerHTML=svgIndiceCapacites('Toutes filières',totaux,2022,['Ensemble','Public','Privé']).replace('<h4>Toutes filières</h4>', '<h4>Toutes filières - indice valeur 100 en 2022</h4>');
+    document.getElementById('candidatures_graphique_global').innerHTML=svgGraphique('Toutes filières',totaux,['Ensemble','Public','Privé','Non renseigné']);
+    document.getElementById('capacites_graphique_global_indice_2020').innerHTML=svgIndiceCapacites('Toutes filières',totaux,2020,['Ensemble','Public','Privé']);
+    document.getElementById('capacites_graphique_global_indice_2022').innerHTML=svgIndiceCapacites('Toutes filières',totaux,2022,['Ensemble','Public','Privé']);
     graphes.innerHTML=uniques(graphs,'filiere').map(f=>svgGraphique(f,graphs)).join('')||'<p>Aucune donnée pour cette sélection.</p>';
     [2020,2022].forEach(base=>{
       const cible=document.getElementById('capacites_indices_'+base);
